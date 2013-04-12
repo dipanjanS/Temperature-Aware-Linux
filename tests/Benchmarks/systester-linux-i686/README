@@ -1,0 +1,7 @@
+System Stability Tester 1.5.1 
+for GNU/Linux i686 machines.
+
+Tools used for this build:
+GCC 4.6.3
+Qt  4.8.1
+GMP 5.0.5

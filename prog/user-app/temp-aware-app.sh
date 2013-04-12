@@ -1,0 +1,259 @@
+#!/bin/bash
+
+MAX_TEMP=$(zenity --title "Temperature Aware Linux"\
+		  --entry --text "Enter the threshold temperature for the system")
+		  
+if [ $? -eq 0 ]
+then
+	(for x in 10 30 50 70 90;
+	 do
+	 	echo $x;
+	 	sleep 1;
+	 done) | zenity --width=200 --height=200\
+	       --title="Temperature Aware Linux" --progress\
+	       --pulsate --text="Setting up application..."
+		          
+else
+	zenity --error --text="No Temperature Specified"
+	exit 1
+	 
+fi
+
+
+# The frequency will increase when low temperature is reached.
+let LOW_TEMP=$MAX_TEMP-5
+
+#echo ${TEMP_ARR[0]}
+#echo ${TEMP_ARR[1]}
+
+CORES=$(nproc) # Get number of CPU cores.
+echo -e "Number of CPU cores detected: $CORES\n"
+
+# Temperatures internally are calculated to the thousandth.
+MAX_TEMP=${MAX_TEMP}000
+LOW_TEMP=${LOW_TEMP}000
+
+# FREQ_LIST is a list (array) of all available cpu frequencies the system allows.
+declare -a FREQ_LIST=($(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies))
+
+# CURRENT_FREQ relates to the FREQ_LIST by keeping record of the currently set frequency.
+let CURRENT_FREQ=1
+
+function max_temp {
+	get_temp
+	TEMP_ARR=($TEMP1 $TEMP2)
+	len=${#TEMP_ARR[*]};
+	#echo "length $len"
+	hottest=${TEMP_ARR[0]}
+	coldest=${TEMP_ARR[0]}
+	hotcore=0
+	coldcore=0
+	c=0
+	echo "before hot $hottest $hotcore"
+	echo "before cold $coldest $coldcore"
+	
+	for i in ${TEMP_ARR[@]}
+	do
+     		if [[ $i -gt $hottest ]]
+     		then
+        		hottest=$i
+     			hotcore=$c
+     		fi
+		
+		if [[ $i -lt $coldest ]]
+     		then
+        		coldest=$i
+        		coldcore=$c
+     		fi
+     		c=`expr $c + 1`
+	done
+	
+	if [[ $CORES -eq 4 ]]
+     	then
+     		if [[ $hotcore -eq 1 ]]
+     		then 	
+     			hotcore=3
+     		fi
+     		if [[ $coldest -eq 1 ]]
+     		then 		
+     			coldcore=3
+     		fi
+     	fi
+	echo "after hot $hottest $hotcore"
+	echo "after cold $coldest $coldcore"	
+}
+
+function set_freq {
+	echo ${FREQ_LIST[$1]}
+	for((i=0;i<$CORES;i++)); do
+		echo ${FREQ_LIST[$1]} > /sys/devices/system/cpu/cpu$i/cpufreq/scaling_max_freq
+	done
+}
+
+function throttle {
+	if [ $CURRENT_FREQ -ne $((${#FREQ_LIST[@]}-1)) ]
+	then
+		let CURRENT_FREQ+=1
+		notify-send -i dialog-warning "Temperature above threshold. Throttling CPU now."
+		#echo -n "too hot throttling "
+		set_freq $CURRENT_FREQ
+	fi
+}
+
+
+function unthrottle {
+	if [ $CURRENT_FREQ -ne 0 ]
+	then
+		let CURRENT_FREQ-=1
+		notify-send -i dialog-information "Temperature below threshold. Unthrottling CPU now."
+		#echo -n "getting cooler unthrottling "
+		set_freq $CURRENT_FREQ
+	fi
+}
+
+function control_process {
+	max_temp
+	if [ $hottest -ge $MAX_TEMP ]
+	then
+		allocate_core
+	fi
+}
+
+function allocate_core {
+	PROCESS=$(ps -eo pcpu,%mem,pid,comm | sort -nr | head -n 1 | awk '{print $3;}')
+	
+	if [[ $CORES -eq 2 ]]
+     	then
+     		CORE=($(taskset -c -p $PROCESS | awk '{print $6;}' | tr ',' ' '))
+     	fi
+     	
+     	if [[ $CORES -eq 4 ]]
+     	then
+     		CORE=($(taskset -c -p $PROCESS | awk '{print $6;}' | tr '-' ' '))
+     	fi
+	
+     	len=${#CORE[*]};
+	CPU_AFF=$(ps -F ax | awk '{print $2,$7}' | grep $PROCESS | awk '{print $2}')
+	echo "currently $PROCESS is in cpu $CPU_AFF"
+	
+	max_temp
+	echo "hotcore $hotcore"
+	echo "coldcore $coldcore"
+	echo "cpu length $len"
+	
+	for i in ${CORE[@]}
+	do
+		echo "cpu $i"
+		if [ $i -ne $coldcore ]
+		then
+			taskset -c -p $coldcore $PROCESS   
+			break
+		fi
+	done
+}
+
+function swap_cores {
+	max_temp
+	hot_temp=`expr $hottest - 0`
+	
+	if [ $hot_temp -ge $MAX_TEMP ]
+	then
+		
+		if [ $CORES -eq 2 ]
+		then
+			PROCESS_LIST=($(ps -F -ef | awk '{print $2,$7}' | grep "$hotcore$" | awk '{print $1}' | head -n 25))
+			
+			for procid in ${PROCESS_LIST[@]}
+			do
+				echo "process $procid"
+				taskset -c -p $coldcore $procid
+			done
+
+		elif [ $CORES -eq 4 ]
+		then
+			PROCESS_LIST1=($(ps -F -ef | awk '{print $2,$7}' | grep "$hotcore$" | awk '{print $1}' | head -n 15))
+
+			for procid1 in ${PROCESS_LIST1[@]}
+			do
+				echo "process $procid1"
+				taskset -c -p $coldcore $procid1
+			done
+
+			if [ $hotcore -eq 0 ]
+			then
+				newhotcore=1
+				newcoldcore=2
+			
+			elif [ $hotcore -eq 3 ] 
+			then
+				newhotcore=2
+				newcoldcore=1
+			fi
+
+			PROCESS_LIST2=($(ps -F -ef | awk '{print $2,$7}' | grep "$newhotcore$" | awk '{print $1}' | head -n 15))
+
+			for procid2 in ${PROCESS_LIST2[@]}
+			do
+				echo "process $procid2"
+				taskset -c -p $newcoldcore $procid2
+			done
+		fi
+	fi
+}
+
+function suspend_process {
+	get_process_id
+	SELECT_PROCESS=$(ps -eo pcpu,%mem,pid,comm | sort -nr | head -n 2 | awk '{print $3;}')
+	max_temp
+	
+	temp=`expr $hottest - 4000`
+	echo "temp is $temp"
+	if [ $temp -ge $MAX_TEMP ]
+	then
+		for procid in ${SELECT_PROCESS[@]}
+		do
+			if [[ $procid -ne $pid ]]
+			then
+				echo -n "suspending process now"
+				kill -STOP $procid
+				sleep 5
+				echo -n "resuming process now"
+				kill -CONT $procid
+				break
+			fi
+		done
+	fi
+}
+
+function get_temp {
+	# Get the system temperature.	
+	
+	TEMP=$(cat /sys/class/thermal/thermal_zone0/temp)
+	TEMP1=($(cat /sys/devices/platform/coretemp.0/temp2_input))
+	TEMP2=($(cat /sys/devices/platform/coretemp.0/temp4_input))
+	#TEMP=$(cat /sys/class/hwmon/hwmon0/temp1_input) 
+	#TEMP=$(cat /sys/class/hwmon/hwmon1/device/temp1_input)
+	TEMP=`expr $TEMP + 2000`
+	echo $TEMP
+}
+
+function get_process_id {
+	pid=$$
+}
+
+while true; do
+	get_temp
+	if   [ $TEMP -ge $MAX_TEMP ]
+	then # Throttle if too hot.
+		throttle
+	elif [ $TEMP -le $LOW_TEMP ]
+	then
+		unthrottle
+	fi
+	
+	control_process
+	suspend_process
+	swap_cores
+	sleep 3  #monitor every 3 seconds so that load caused is less.
+	
+done
