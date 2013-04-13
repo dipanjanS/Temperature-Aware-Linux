@@ -1,9 +1,9 @@
-Temperature-Aware Linux
-=======================
+<center><h1>Temperature-Aware Linux</h1></center>
+<hr>
 
 
-Abstract
----------
+<h3>Abstract</h3>
+<hr>
 
 An Operating System may be called as temperature-aware, if it has the property of monitoring hardware 
 temperatures ( like processor thermal parameters ), with selected processes or services being unavailable
@@ -11,8 +11,8 @@ when a particular threshold is exceeded. We propose a temperature-aware variant 
 where we combine various thermal-aware techniques to create a uniform temperature distribution on multi-core 
 systems and control the temperature.
 
-Introduction
--------------
+<h3>Introduction</h3>
+<hr>
 
 With the advancement of technology in the 21st century, there has been an increase in the demand for high 
 performance which has led to better and faster systems with multi-core chips. However, these modern systems 
@@ -20,15 +20,15 @@ consume more power and their superior performance leads to elevated system tempe
 systems often lead to non uniform temperature distribution over the chip and form hotspots. Hence, temperature 
 control is now a critical issue for circuits as well as OS design.
 
-Motivation
------------
+<h3>Motivation</h3>
+<hr>
 
 The main motivation behind the project is to address the important issue of controlling hardware temperatures 
 in modern multi-core systems, to increase the lifetime of the processor and prevent elevated temperatures 
 from damaging the hardware.
 
-Project Objectives
--------------------
+<h3>Project Objectives<h3>
+<hr>
 
 The main objectives of our project are listed below.
 
@@ -38,8 +38,8 @@ The main objectives of our project are listed below.
 4. Take necessary actions like DFS, migrating cores and suspending processes if the threshold temperature is exceeded. 
 
 
-Important Aspects
-------------------
+<h3>Important Aspects<h3>
+<hr>
 
 We have implemented various temperature-aware techniques in our application which runs continuously, 
 monitors system temperatures and takes action using the following techniques as mentioned below.
