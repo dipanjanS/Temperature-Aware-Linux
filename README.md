@@ -1,7 +1,7 @@
 <center><h1>Temperature-Aware Linux</h1></center>
 <hr>
 
-
+<br><br><br>
 <h3>Abstract</h3>
 <hr>
 
@@ -27,7 +27,7 @@ The main motivation behind the project is to address the important issue of cont
 in modern multi-core systems, to increase the lifetime of the processor and prevent elevated temperatures 
 from damaging the hardware.
 
-<h3>Project Objectives<h3>
+<h3>Project Objectives</h3>
 <hr>
 
 The main objectives of our project are listed below.
@@ -38,7 +38,7 @@ The main objectives of our project are listed below.
 4. Take necessary actions like DFS, migrating cores and suspending processes if the threshold temperature is exceeded. 
 
 
-<h3>Important Aspects<h3>
+<h3>Important Aspects</h3>
 <hr>
 
 We have implemented various temperature-aware techniques in our application which runs continuously, 
