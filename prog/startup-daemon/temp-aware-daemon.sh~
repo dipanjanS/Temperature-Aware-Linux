@@ -1,24 +1,12 @@
 #!/bin/bash
 
-#if [ $# -ne 1 ]
-#then
-	# If temperature wasn't given, then print a message and exit.
-#	echo "Please supply a maximum desired temperature in Celsius." 1>&2
-#	echo "For example:  ${0} 60" 1>&2
-#	exit 2
-#else
-	#Set the first argument as the maximum desired temperature.
-	MAX_TEMP=60
-#fi
+#Set maximum desired temperature.
+MAX_TEMP=60
 
 # The frequency will increase when low temperature is reached.
 let LOW_TEMP=$MAX_TEMP-5
 
-#echo ${TEMP_ARR[0]}
-#echo ${TEMP_ARR[1]}
-
 CORES=$(nproc) # Get number of CPU cores.
-echo -e "Number of CPU cores detected: $CORES\n"
 
 # Temperatures internally are calculated to the thousandth.
 MAX_TEMP=${MAX_TEMP}000
@@ -34,14 +22,11 @@ function max_temp {
 	get_temp
 	TEMP_ARR=($TEMP1 $TEMP2)
 	len=${#TEMP_ARR[*]};
-	#echo "length $len"
 	hottest=${TEMP_ARR[0]}
 	coldest=${TEMP_ARR[0]}
 	hotcore=0
 	coldcore=0
 	c=0
-	echo "before hot $hottest $hotcore"
-	echo "before cold $coldest $coldcore"
 	
 	for i in ${TEMP_ARR[@]}
 	do
@@ -70,8 +55,6 @@ function max_temp {
      			coldcore=3
      		fi
      	fi
-	echo "after hot $hottest $hotcore"
-	echo "after cold $coldest $coldcore"	
 }
 
 function set_freq {
@@ -85,7 +68,6 @@ function throttle {
 	if [ $CURRENT_FREQ -ne $((${#FREQ_LIST[@]}-1)) ]
 	then
 		let CURRENT_FREQ+=1
-		echo -n "too hot throttling "
 		set_freq $CURRENT_FREQ
 	fi
 }
@@ -95,7 +77,6 @@ function unthrottle {
 	if [ $CURRENT_FREQ -ne 0 ]
 	then
 		let CURRENT_FREQ-=1
-		echo -n "getting cooler unthrottling "
 		set_freq $CURRENT_FREQ
 	fi
 }
@@ -123,16 +104,11 @@ function allocate_core {
 	
      	len=${#CORE[*]};
 	CPU_AFF=$(ps -F ax | awk '{print $2,$7}' | grep $PROCESS | awk '{print $2}')
-	echo "currently $PROCESS is in cpu $CPU_AFF"
 	
 	max_temp
-	echo "hotcore $hotcore"
-	echo "coldcore $coldcore"
-	echo "cpu length $len"
 	
 	for i in ${CORE[@]}
 	do
-		echo "cpu $i"
 		if [ $i -ne $coldcore ]
 		then
 			taskset -c -p $coldcore $PROCESS   
@@ -154,7 +130,6 @@ function swap_cores {
 			
 			for procid in ${PROCESS_LIST[@]}
 			do
-				echo "process $procid"
 				taskset -c -p $coldcore $procid
 			done
 
@@ -164,7 +139,6 @@ function swap_cores {
 
 			for procid1 in ${PROCESS_LIST1[@]}
 			do
-				echo "process $procid1"
 				taskset -c -p $coldcore $procid1
 			done
 
@@ -183,7 +157,6 @@ function swap_cores {
 
 			for procid2 in ${PROCESS_LIST2[@]}
 			do
-				echo "process $procid2"
 				taskset -c -p $newcoldcore $procid2
 			done
 		fi
@@ -196,17 +169,14 @@ function suspend_process {
 	max_temp
 	
 	temp=`expr $hottest - 4000`
-	echo "temp is $temp"
 	if [ $temp -ge $MAX_TEMP ]
 	then
 		for procid in ${SELECT_PROCESS[@]}
 		do
 			if [[ $procid -ne $pid ]]
 			then
-				echo -n "suspending process now"
 				kill -STOP $procid
 				sleep 5
-				echo -n "resuming process now"
 				kill -CONT $procid
 			fi
 			break
@@ -216,14 +186,12 @@ function suspend_process {
 
 function get_temp {
 	# Get the system temperature.	
-	
 	TEMP=$(cat /sys/class/thermal/thermal_zone0/temp)
 	TEMP1=($(cat /sys/devices/platform/coretemp.0/temp2_input))
 	TEMP2=($(cat /sys/devices/platform/coretemp.0/temp4_input))
 	#TEMP=$(cat /sys/class/hwmon/hwmon0/temp1_input) 
 	#TEMP=$(cat /sys/class/hwmon/hwmon1/device/temp1_input)
 	TEMP=`expr $TEMP + 2000`
-	echo $TEMP
 }
 
 function get_process_id {

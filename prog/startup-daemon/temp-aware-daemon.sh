@@ -1,4 +1,19 @@
 #!/bin/bash
+#
+#         ######################################################################################
+#	  #########      TEMPERATURE AWARE LINUX ( temperature monitoring tool )      ##########
+#         ######################################################################################
+#
+#	This program reads hardware temperature values corresponding to individual cores and also the system
+#	aggregate temperature. All readings are taken dynamically and analyzed. If the temperature crosses a 
+#	pre-set threshold, several thermal-aware techniques are used to control and maintain the system temperature		
+#	below the threshold level. The main techniques include,
+#					1. DFS
+#					2. Core Hopping
+#					3. Heat Balancing
+#					4. Deferred Execution
+#
+#
 
 #Set maximum desired temperature.
 MAX_TEMP=60
@@ -18,6 +33,7 @@ declare -a FREQ_LIST=($(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_availab
 # CURRENT_FREQ relates to the FREQ_LIST by keeping record of the currently set frequency.
 let CURRENT_FREQ=1
 
+# This find the hottest core and the coolest core of the system at any instance
 function max_temp {
 	get_temp
 	TEMP_ARR=($TEMP1 $TEMP2)
@@ -57,6 +73,7 @@ function max_temp {
      	fi
 }
 
+# write the CPU frequency value to the system file to scale the CPU frequency up or down as required
 function set_freq {
 	echo ${FREQ_LIST[$1]}
 	for((i=0;i<$CORES;i++)); do
@@ -64,6 +81,7 @@ function set_freq {
 	done
 }
 
+# scales the CPU frequency up one notch each time it is called
 function throttle {
 	if [ $CURRENT_FREQ -ne $((${#FREQ_LIST[@]}-1)) ]
 	then
@@ -72,7 +90,7 @@ function throttle {
 	fi
 }
 
-
+# scales the CPU frequency down one notch each time it is called
 function unthrottle {
 	if [ $CURRENT_FREQ -ne 0 ]
 	then
@@ -81,6 +99,7 @@ function unthrottle {
 	fi
 }
 
+# controls temperature by checking if hottest core temperature crosses threshold then it calls allocate_core
 function control_process {
 	max_temp
 	if [ $hottest -ge $MAX_TEMP ]
@@ -89,6 +108,7 @@ function control_process {
 	fi
 }
 
+# performs core hopping by allocating CPU intensive processes to the coolest core
 function allocate_core {
 	PROCESS=$(ps -eo pcpu,%mem,pid,comm | sort -nr | head -n 1 | awk '{print $3;}')
 	
@@ -117,6 +137,7 @@ function allocate_core {
 	done
 }
 
+# implements heat balancing where processes are migrated from the hotter to cooler cores
 function swap_cores {
 	max_temp
 	hot_temp=`expr $hottest - 0`
@@ -163,6 +184,7 @@ function swap_cores {
 	fi
 }
 
+# implements deferred execution of CPU intensive processes which are responsible for rise in system temperature
 function suspend_process {
 	get_process_id
 	SELECT_PROCESS=$(ps -eo pcpu,%mem,pid,comm | sort -nr | head -n 2 | awk '{print $3;}')
@@ -184,8 +206,9 @@ function suspend_process {
 	fi
 }
 
+# Get the system temperature values	
 function get_temp {
-	# Get the system temperature.	
+	
 	TEMP=$(cat /sys/class/thermal/thermal_zone0/temp)
 	TEMP1=($(cat /sys/devices/platform/coretemp.0/temp2_input))
 	TEMP2=($(cat /sys/devices/platform/coretemp.0/temp4_input))
@@ -194,10 +217,13 @@ function get_temp {
 	TEMP=`expr $TEMP + 2000`
 }
 
+# Get the process id of this application
 function get_process_id {
 	pid=$$
 }
 
+
+# main method
 while true; do
 	get_temp
 	if   [ $TEMP -ge $MAX_TEMP ]
