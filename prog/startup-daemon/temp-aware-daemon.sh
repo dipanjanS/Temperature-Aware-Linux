@@ -200,8 +200,8 @@ function suspend_process {
 				kill -STOP $procid
 				sleep 5
 				kill -CONT $procid
+				break
 			fi
-			break
 		done
 	fi
 }
