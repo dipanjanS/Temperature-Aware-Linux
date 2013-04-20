@@ -81,7 +81,7 @@ function set_freq {
 	done
 }
 
-# scales the CPU frequency up one notch each time it is called
+# scales the CPU frequency down one notch each time it is called
 function throttle {
 	if [ $CURRENT_FREQ -ne $((${#FREQ_LIST[@]}-1)) ]
 	then
@@ -90,7 +90,7 @@ function throttle {
 	fi
 }
 
-# scales the CPU frequency down one notch each time it is called
+# scales the CPU frequency up one notch each time it is called
 function unthrottle {
 	if [ $CURRENT_FREQ -ne 0 ]
 	then
